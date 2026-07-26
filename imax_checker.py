@@ -67,7 +67,7 @@ def get_events():
 
     days = (end - start).days
 
-    print(f"Checking {days} days")
+   print(f"Checking {days} days", flush=True)
 
     results = []
 
@@ -103,13 +103,15 @@ def get_events():
                 results.append(event)
 
 
-    print(f"Found {len(results)} IMAX 70mm events")
+  print(f"Found {len(results)} IMAX 70mm events", flush=True)
 
     return results
 
 
 def main():
 
+        print("IMAX watcher started", flush=True)
+    
     events = get_events()
 
     current = [
@@ -139,7 +141,7 @@ def main():
         send_telegram(msg)
 
     else:
-        print("No new events")
+       print("No new events", flush=True)
 
 
     save_state(current)
