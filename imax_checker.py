@@ -22,15 +22,22 @@ def send_telegram(message):
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
 
-    requests.post(
-        url,
-        json={
-            "chat_id": chat_id,
-            "text": message,
-            "disable_web_page_preview": True
-        },
-        timeout=15
-    )
+  response = requests.post(
+    url,
+    json={
+        "chat_id": chat_id,
+        "text": message,
+        "disable_web_page_preview": True
+    },
+    timeout=15
+)
+
+print(
+    f"Telegram response: {response.text}",
+    flush=True
+)
+
+response.raise_for_status()
 
 
 def load_state():
