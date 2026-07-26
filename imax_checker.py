@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 FILM_ID = "7268s2r"
 CINEMA_ID = "1052"
 
+FILM_URL = "https://www.cinemacity.cz/films/odyssea/7268s2r"
+
 STATE_FILE = "state.json"
 
 API_BASE = (
@@ -71,6 +73,16 @@ def save_state(data):
             indent=2,
             ensure_ascii=False
         )
+
+
+def format_datetime(value):
+
+    dt = datetime.fromisoformat(value)
+
+    return (
+        dt.strftime("%d.%m.%Y"),
+        dt.strftime("%H:%M")
+    )
 
 
 def get_events():
@@ -151,12 +163,9 @@ def get_events():
                 results.append(
                     {
                         "id": event["id"],
-                        "date": event["eventDateTime"],
+                        "datetime": event["eventDateTime"],
                         "hall": event.get(
                             "auditorium"
-                        ),
-                        "booking": event.get(
-                            "bookingLink"
                         )
                     }
                 )
@@ -185,27 +194,68 @@ def main():
     old = load_state()
 
 
-    # TEST MODE - pouze dočasně
-    # ověřuje funkčnost Telegramu
+    # první běh pouze uloží aktuální stav
+    if old is None:
 
-    if events:
+        save_state(current)
 
-        event = events[0]
+        print(
+            "First run. State saved. No notification sent.",
+            flush=True
+        )
+
+        return
+
+
+    new_events = [
+        event
+        for event_id, event in current.items()
+        if event_id not in old
+    ]
+
+
+    if new_events:
 
         message = (
-            "🧪 TEST - IMAX watcher Telegram funguje!\n\n"
-            "🎬 Odyssea\n"
+            "🎬 NOVÁ IMAX 70mm projekce!\n\n"
             "🏛 Cinema City Flora\n"
             "🎞 IMAX 70mm\n\n"
-            f"📅 {event['date']}\n"
-            f"🏟 {event['hall']}\n"
-            f"🔗 {event['booking']}"
         )
+
+
+        for event in new_events:
+
+            date, time = format_datetime(
+                event["datetime"]
+            )
+
+            message += (
+                f"📅 {date}\n"
+                f"🕒 {time}\n"
+                f"🏟 {event['hall']}\n\n"
+            )
+
+
+        message += (
+            "🔗 Film:\n"
+            f"{FILM_URL}"
+        )
+
+
+        if len(message) > 4000:
+
+            message = (
+                "🎬 Nové IMAX 70mm projekce!\n\n"
+                f"Počet nových termínů: {len(new_events)}\n\n"
+                "🔗 Film:\n"
+                f"{FILM_URL}"
+            )
+
 
         send_telegram(message)
 
         print(
-            "Test Telegram notification sent",
+            "Telegram notification sent",
             flush=True
         )
 
@@ -213,7 +263,7 @@ def main():
     else:
 
         print(
-            "No IMAX events found",
+            "No new events",
             flush=True
         )
 
