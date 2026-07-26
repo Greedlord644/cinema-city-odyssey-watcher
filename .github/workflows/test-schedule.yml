@@ -1,6 +1,7 @@
 name: Test Schedule
 
 on:
+  push:
   schedule:
     - cron: "*/5 * * * *"
 
