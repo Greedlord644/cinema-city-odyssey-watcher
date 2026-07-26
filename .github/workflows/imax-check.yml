@@ -1,4 +1,4 @@
-name: Check IMAX Flora
+name: Check IMAX Flora v2
 
 on:
   schedule:
