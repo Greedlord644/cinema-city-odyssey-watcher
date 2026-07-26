@@ -17,10 +17,14 @@ API_BASE = (
 
 
 def send_telegram(message):
+
     token = os.environ["TELEGRAM_TOKEN"]
     chat_id = os.environ["TELEGRAM_CHAT_ID"]
 
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    url = (
+        f"https://api.telegram.org/"
+        f"bot{token}/sendMessage"
+    )
 
     response = requests.post(
         url,
@@ -41,8 +45,9 @@ def send_telegram(message):
 
 
 def load_state():
+
     if not os.path.exists(STATE_FILE):
-        return []
+        return None
 
     with open(
         STATE_FILE,
@@ -53,11 +58,13 @@ def load_state():
 
 
 def save_state(data):
+
     with open(
         STATE_FILE,
         "w",
         encoding="utf-8"
     ) as file:
+
         json.dump(
             data,
             file,
@@ -79,11 +86,13 @@ def get_events():
 
     results = []
 
+
     for i in range(days_to_check):
 
         date = (
             start + timedelta(days=i)
         ).strftime("%Y-%m-%d")
+
 
         url = (
             API_BASE
@@ -91,7 +100,9 @@ def get_events():
             + "?attr=&lang=cs_CZ"
         )
 
+
         try:
+
             response = requests.get(
                 url,
                 timeout=15
@@ -100,6 +111,7 @@ def get_events():
             response.raise_for_status()
 
             data = response.json()
+
 
         except Exception as error:
 
@@ -140,12 +152,8 @@ def get_events():
                     {
                         "id": event["id"],
                         "date": event["eventDateTime"],
-                        "hall": event.get(
-                            "auditorium"
-                        ),
-                        "booking": event.get(
-                            "bookingLink"
-                        )
+                        "hall": event.get("auditorium"),
+                        "booking": event.get("bookingLink")
                     }
                 )
 
@@ -155,29 +163,49 @@ def get_events():
         flush=True
     )
 
+
     return results
+
 
 
 def main():
 
     events = get_events()
 
-    current_ids = [
-        event["id"]
-        for event in events
-    ]
 
-    old_ids = load_state()
+    current = {
+        event["id"]: event
+        for event in events
+    }
+
+
+    old = load_state()
+
+
+    # první spuštění - pouze uložit stav
+    if old is None:
+
+        save_state(current)
+
+        print(
+            "First run. State saved. No notification sent.",
+            flush=True
+        )
+
+        return
+
 
 
     new_events = [
         event
-        for event in events
-        if event["id"] not in old_ids
+        for event_id, event in current.items()
+        if event_id not in old
     ]
 
 
+
     if new_events:
+
 
         message = (
             "🎬 NOVÁ IMAX 70mm projekce!\n\n"
@@ -195,7 +223,24 @@ def main():
             )
 
 
+        # Telegram limit ochrana
+        if len(message) > 4000:
+
+            message = (
+                "🎬 Nové IMAX 70mm projekce!\n\n"
+                f"Počet nových termínů: {len(new_events)}\n\n"
+            )
+
+            for event in new_events[:10]:
+
+                message += (
+                    f"📅 {event['date']}\n"
+                    f"🔗 {event['booking']}\n\n"
+                )
+
+
         send_telegram(message)
+
 
         print(
             "Telegram notification sent",
@@ -211,7 +256,8 @@ def main():
         )
 
 
-    save_state(current_ids)
+    save_state(current)
+
 
 
 if __name__ == "__main__":
