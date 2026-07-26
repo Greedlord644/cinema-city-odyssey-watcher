@@ -1,34 +1,46 @@
-name: Check IMAX Flora
+name: Check IMAX Flora Monitor
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "* * * * *"
+
   workflow_dispatch:
+
 
 permissions:
   contents: write
 
+
 jobs:
   check:
+
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
+
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+
       - name: Install dependencies
-        run: pip install requests
+        run: |
+          pip install requests
+
 
       - name: Run checker
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python imax_checker.py
+
+        run: |
+          python imax_checker.py
+
 
       - name: Save state
         run: |
