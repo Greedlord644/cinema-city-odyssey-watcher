@@ -9,7 +9,7 @@ CINEMA_ID = "1052"
 
 STATE_FILE = "state.json"
 
-API_BASE = (
+BASE_URL = (
     "https://www.cinemacity.cz/cz/data-api-service/v1/"
     "quickbook/10101/cinema-events/in-group/prague/"
     f"with-film/{FILM_ID}/at-date/"
@@ -20,16 +20,14 @@ def send_telegram(message):
     token = os.environ["TELEGRAM_TOKEN"]
     chat_id = os.environ["TELEGRAM_CHAT_ID"]
 
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-
     requests.post(
-        url,
+        f"https://api.telegram.org/bot{token}/sendMessage",
         json={
             "chat_id": chat_id,
             "text": message,
             "disable_web_page_preview": True
         },
-        timeout=20
+        timeout=15
     )
 
 
@@ -41,115 +39,110 @@ def load_state():
         return json.load(f)
 
 
-def save_state(data):
+def save_state(events):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+        json.dump(events, f, indent=2)
 
 
-def get_relevant_events():
+def get_program_end_date():
+
+    url = (
+        "https://www.cinemacity.cz/cz/data-api-service/v1/"
+        "quickbook/10101/groups/with-film/"
+        f"{FILM_ID}/until/2027-12-31"
+        "?attr=&lang=cs_CZ"
+    )
+
+    r = requests.get(url, timeout=15)
+    r.raise_for_status()
+
+    # zatím používáme bezpečný rozsah
+    return datetime.now() + timedelta(days=45)
+
+
+def get_events():
+
+    start = datetime.now()
+    end = get_program_end_date()
+
+    days = (end - start).days
+
+    print(f"Checking {days} days")
+
     results = []
 
-    today = datetime.now()
+    for i in range(days + 1):
 
-    # kontrolujeme cca rok dopředu
-    for i in range(0, 365):
+        date = (
+            start + timedelta(days=i)
+        ).strftime("%Y-%m-%d")
 
-        date = (today + timedelta(days=i)).strftime("%Y-%m-%d")
-
-        url = (
-            API_BASE
-            + date
-            + "?attr=&lang=cs_CZ"
-        )
+        url = BASE_URL + date + "?attr=&lang=cs_CZ"
 
         try:
-            response = requests.get(url, timeout=20)
-            response.raise_for_status()
-            data = response.json()
+            r = requests.get(url, timeout=15)
+            r.raise_for_status()
+            data = r.json()
 
         except Exception:
             continue
 
 
-        body = data.get("body", {})
-
-        events = body.get("events", [])
-
-        for event in events:
+        for event in data.get("body", {}).get("events", []):
 
             if event.get("cinemaId") != CINEMA_ID:
                 continue
 
             attrs = event.get("attributeIds", [])
 
-            if "70-mm" not in attrs:
-                continue
-
-            if "subbed" not in attrs:
-                continue
-
-            if "original-lang-en" not in attrs:
-                continue
+            if (
+                "70-mm" in attrs
+                and "subbed" in attrs
+                and "original-lang-en" in attrs
+            ):
+                results.append(event)
 
 
-            results.append(
-                {
-                    "id": event["id"],
-                    "date": event["eventDateTime"],
-                    "hall": event.get("auditorium"),
-                    "availability": event.get("availabilityRatio"),
-                    "booking": event.get("bookingLink")
-                }
-            )
+    print(f"Found {len(results)} IMAX 70mm events")
 
     return results
 
 
 def main():
 
-    current = get_relevant_events()
+    events = get_events()
 
-    current_ids = [
-        x["id"]
-        for x in current
+    current = [
+        e["id"]
+        for e in events
     ]
 
-    old_ids = load_state()
+    old = load_state()
 
-    new_events = [
-        x for x in current
-        if x["id"] not in old_ids
+    new = [
+        e for e in events
+        if e["id"] not in old
     ]
 
 
-    if new_events:
+    if new:
 
-        message = (
-            "🎬 NOVÁ IMAX 70mm projekce\n\n"
-            "Cinema City Flora\n\n"
-        )
+        msg = "🎬 Nová IMAX 70mm projekce Flora\n\n"
 
-        for event in new_events:
-
-            free = event["availability"]
-
-            if free is not None:
-                free = round(free * 100, 1)
-                free_text = f"{free}% volných míst"
-            else:
-                free_text = ""
-
-            message += (
-                f"📅 {event['date']}\n"
-                f"🏛 {event['hall']}\n"
-                f"🎟 {free_text}\n"
-                f"{event['booking']}\n\n"
+        for e in new:
+            msg += (
+                f"📅 {e['eventDateTime']}\n"
+                f"🏛 {e['auditorium']}\n"
+                f"🎟 {e['bookingLink']}\n\n"
             )
 
-        send_telegram(message)
+        send_telegram(msg)
+
+    else:
+        print("No new events")
 
 
-    save_state(current_ids)
+    save_state(current)
 
 
 if __name__ == "__main__":
