@@ -22,43 +22,54 @@ def send_telegram(message):
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
 
-  response = requests.post(
-    url,
-    json={
-        "chat_id": chat_id,
-        "text": message,
-        "disable_web_page_preview": True
-    },
-    timeout=15
-)
+    response = requests.post(
+        url,
+        json={
+            "chat_id": chat_id,
+            "text": message,
+            "disable_web_page_preview": True
+        },
+        timeout=15
+    )
 
-print(
-    f"Telegram response: {response.text}",
-    flush=True
-)
+    print(
+        f"Telegram response: {response.text}",
+        flush=True
+    )
 
-response.raise_for_status()
+    response.raise_for_status()
 
 
 def load_state():
     if not os.path.exists(STATE_FILE):
         return []
 
-    with open(STATE_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    with open(
+        STATE_FILE,
+        "r",
+        encoding="utf-8"
+    ) as file:
+        return json.load(file)
 
 
 def save_state(data):
-    with open(STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    with open(
+        STATE_FILE,
+        "w",
+        encoding="utf-8"
+    ) as file:
+        json.dump(
+            data,
+            file,
+            indent=2,
+            ensure_ascii=False
+        )
 
 
 def get_events():
 
     start = datetime.now()
 
-    # Cinema City běžně zveřejňuje program pouze několik týdnů dopředu.
-    # 45 dní je bezpečná rezerva.
     days_to_check = 45
 
     print(
@@ -90,11 +101,13 @@ def get_events():
 
             data = response.json()
 
-        except Exception as e:
+        except Exception as error:
+
             print(
-                f"API error {date}: {e}",
+                f"API error {date}: {error}",
                 flush=True
             )
+
             continue
 
 
@@ -104,28 +117,31 @@ def get_events():
             .get("events", [])
         )
 
+
         for event in events:
 
             if event.get("cinemaId") != CINEMA_ID:
                 continue
+
 
             attributes = event.get(
                 "attributeIds",
                 []
             )
 
+
             if (
                 "70-mm" in attributes
                 and "subbed" in attributes
                 and "original-lang-en" in attributes
             ):
+
                 results.append(
                     {
                         "id": event["id"],
                         "date": event["eventDateTime"],
-                        "hall": event.get("auditorium"),
-                        "availability": event.get(
-                            "availabilityRatio"
+                        "hall": event.get(
+                            "auditorium"
                         ),
                         "booking": event.get(
                             "bookingLink"
@@ -169,6 +185,7 @@ def main():
             "IMAX VOLVO\n\n"
         )
 
+
         for event in new_events:
 
             message += (
@@ -184,6 +201,7 @@ def main():
             "Telegram notification sent",
             flush=True
         )
+
 
     else:
 
