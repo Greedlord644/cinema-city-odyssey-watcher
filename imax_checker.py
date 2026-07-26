@@ -152,8 +152,12 @@ def get_events():
                     {
                         "id": event["id"],
                         "date": event["eventDateTime"],
-                        "hall": event.get("auditorium"),
-                        "booking": event.get("bookingLink")
+                        "hall": event.get(
+                            "auditorium"
+                        ),
+                        "booking": event.get(
+                            "bookingLink"
+                        )
                     }
                 )
 
@@ -162,7 +166,6 @@ def get_events():
         f"Found {len(results)} IMAX 70mm events",
         flush=True
     )
-
 
     return results
 
@@ -182,68 +185,27 @@ def main():
     old = load_state()
 
 
-    # první spuštění - pouze uložit stav
-    if old is None:
+    # TEST MODE - pouze dočasně
+    # ověřuje funkčnost Telegramu
 
-        save_state(current)
+    if events:
 
-        print(
-            "First run. State saved. No notification sent.",
-            flush=True
-        )
-
-        return
-
-
-
-    new_events = [
-        event
-        for event_id, event in current.items()
-        if event_id not in old
-    ]
-
-
-
-    if new_events:
-
+        event = events[0]
 
         message = (
-            "🎬 NOVÁ IMAX 70mm projekce!\n\n"
-            "Cinema City Flora\n"
-            "IMAX VOLVO\n\n"
+            "🧪 TEST - IMAX watcher Telegram funguje!\n\n"
+            "🎬 Odyssea\n"
+            "🏛 Cinema City Flora\n"
+            "🎞 IMAX 70mm\n\n"
+            f"📅 {event['date']}\n"
+            f"🏟 {event['hall']}\n"
+            f"🔗 {event['booking']}"
         )
-
-
-        for event in new_events:
-
-            message += (
-                f"📅 {event['date']}\n"
-                f"🏛 {event['hall']}\n"
-                f"🔗 {event['booking']}\n\n"
-            )
-
-
-        # Telegram limit ochrana
-        if len(message) > 4000:
-
-            message = (
-                "🎬 Nové IMAX 70mm projekce!\n\n"
-                f"Počet nových termínů: {len(new_events)}\n\n"
-            )
-
-            for event in new_events[:10]:
-
-                message += (
-                    f"📅 {event['date']}\n"
-                    f"🔗 {event['booking']}\n\n"
-                )
-
 
         send_telegram(message)
 
-
         print(
-            "Telegram notification sent",
+            "Test Telegram notification sent",
             flush=True
         )
 
@@ -251,7 +213,7 @@ def main():
     else:
 
         print(
-            "No new events",
+            "No IMAX events found",
             flush=True
         )
 
