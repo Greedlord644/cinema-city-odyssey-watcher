@@ -1,16 +1,18 @@
-import requests
 import os
 import json
-from datetime import datetime
+import requests
+from datetime import datetime, timedelta
+
 
 FILM_ID = "7268s2r"
 CINEMA_ID = "1052"
 
-API_URL = (
+STATE_FILE = "state.json"
+
+API_BASE = (
     "https://www.cinemacity.cz/cz/data-api-service/v1/"
-    "quickbook/10101/groups/with-film/"
-    f"{FILM_ID}/until/2027-07-26"
-    "?attr=&lang=cs_CZ"
+    "quickbook/10101/cinema-events/in-group/prague/"
+    f"with-film/{FILM_ID}/at-date/"
 )
 
 
@@ -24,53 +26,131 @@ def send_telegram(message):
         url,
         json={
             "chat_id": chat_id,
-            "text": message
-        }
+            "text": message,
+            "disable_web_page_preview": True
+        },
+        timeout=20
     )
 
 
-def check():
-    r = requests.get(API_URL, timeout=20)
-    r.raise_for_status()
+def load_state():
+    if not os.path.exists(STATE_FILE):
+        return []
 
-    data = r.json()
+    with open(STATE_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-    events = data["body"]["events"]
 
-    matches = []
+def save_state(data):
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
-    for event in events:
 
-        if event["cinemaId"] != CINEMA_ID:
+def get_relevant_events():
+    results = []
+
+    today = datetime.now()
+
+    # kontrolujeme cca rok dopředu
+    for i in range(0, 365):
+
+        date = (today + timedelta(days=i)).strftime("%Y-%m-%d")
+
+        url = (
+            API_BASE
+            + date
+            + "?attr=&lang=cs_CZ"
+        )
+
+        try:
+            response = requests.get(url, timeout=20)
+            response.raise_for_status()
+            data = response.json()
+
+        except Exception:
             continue
 
-        attrs = event.get("attributeIds", [])
 
-        if "70-mm" not in attrs:
-            continue
+        body = data.get("body", {})
 
-        if "subbed" not in attrs:
-            continue
+        events = body.get("events", [])
 
-        if "original-lang-en" not in attrs:
-            continue
+        for event in events:
 
-        matches.append(event)
+            if event.get("cinemaId") != CINEMA_ID:
+                continue
 
-    if matches:
+            attrs = event.get("attributeIds", [])
 
-        msg = "🎬 Nalezen 70mm IMAX Flora!\n\n"
+            if "70-mm" not in attrs:
+                continue
 
-        for e in matches:
-            msg += (
-                f"{e['eventDateTime']}\n"
-                f"Sál: {e['auditorium']}\n"
-                f"Volno: {round(e['availabilityRatio']*100,1)} %\n"
-                f"{e['bookingLink']}\n\n"
+            if "subbed" not in attrs:
+                continue
+
+            if "original-lang-en" not in attrs:
+                continue
+
+
+            results.append(
+                {
+                    "id": event["id"],
+                    "date": event["eventDateTime"],
+                    "hall": event.get("auditorium"),
+                    "availability": event.get("availabilityRatio"),
+                    "booking": event.get("bookingLink")
+                }
             )
 
-        send_telegram(msg)
+    return results
+
+
+def main():
+
+    current = get_relevant_events()
+
+    current_ids = [
+        x["id"]
+        for x in current
+    ]
+
+    old_ids = load_state()
+
+    new_events = [
+        x for x in current
+        if x["id"] not in old_ids
+    ]
+
+
+    if new_events:
+
+        message = (
+            "🎬 NOVÁ IMAX 70mm projekce\n\n"
+            "Cinema City Flora\n\n"
+        )
+
+        for event in new_events:
+
+            free = event["availability"]
+
+            if free is not None:
+                free = round(free * 100, 1)
+                free_text = f"{free}% volných míst"
+            else:
+                free_text = ""
+
+            message += (
+                f"📅 {event['date']}\n"
+                f"🏛 {event['hall']}\n"
+                f"🎟 {free_text}\n"
+                f"{event['booking']}\n\n"
+            )
+
+        send_telegram(message)
+
+
+    save_state(current_ids)
 
 
 if __name__ == "__main__":
-    check()
+    main()
