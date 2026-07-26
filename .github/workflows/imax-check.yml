@@ -1,9 +1,6 @@
 name: Check IMAX Flora Monitor
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
-
   workflow_dispatch:
 
 
@@ -15,6 +12,7 @@ jobs:
   check:
 
     runs-on: ubuntu-latest
+
 
     steps:
 
