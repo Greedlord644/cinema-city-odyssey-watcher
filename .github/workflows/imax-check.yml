@@ -2,7 +2,7 @@ name: Check IMAX Flora Monitor
 
 on:
   schedule:
-    - cron: "* * * * *"
+    - cron: "*/5 * * * *"
 
   workflow_dispatch:
 
