@@ -24,6 +24,18 @@ SEATS_API = (
 )
 
 
+SEATPLAN_API = (
+    "https://tickets.cinemacity.cz/api/seats/"
+    "seatplanV2"
+)
+
+
+SEATPLAN_PARAMS = {
+    "venueId": "80",
+    "seatplanId": "1"
+}
+
+
 def parse_cookies(cookie_string):
 
     cookies = {}
@@ -42,6 +54,7 @@ def parse_cookies(cookie_string):
     return cookies
 
 
+
 def get_headers():
 
     return {
@@ -56,11 +69,13 @@ def get_headers():
     }
 
 
+
 def get_cookies():
 
     return parse_cookies(
         os.environ["CINEMA_COOKIES"]
     )
+
 
 
 def format_datetime(value):
@@ -72,6 +87,7 @@ def format_datetime(value):
     return dt.strftime(
         "%d.%m.%Y %H:%M"
     )
+
 
 
 def get_events():
@@ -163,7 +179,58 @@ def get_seats(presentation_id):
 
 
 
-def get_free_seats(data):
+def get_seat_map():
+
+    response = requests.get(
+        SEATPLAN_API,
+        params=SEATPLAN_PARAMS,
+        headers=get_headers(),
+        cookies=get_cookies(),
+        timeout=15
+    )
+
+
+    response.raise_for_status()
+
+    data = response.json()
+
+
+    seat_map = {}
+
+
+    def scan(obj):
+
+        if isinstance(obj, dict):
+
+            if "n" in obj and "id" in obj:
+
+                seat_map[str(obj["id"])] = str(obj["n"])
+
+
+            for value in obj.values():
+                scan(value)
+
+
+        elif isinstance(obj, list):
+
+            for item in obj:
+                scan(item)
+
+
+    scan(data)
+
+
+    print(
+        f"Seat map loaded: {len(seat_map)} seats",
+        flush=True
+    )
+
+
+    return seat_map
+
+
+
+def get_free_seats(data, seat_map):
 
     seats = {}
 
@@ -176,20 +243,26 @@ def get_free_seats(data):
 
         try:
 
-            _, seat, row = key.split("_")
+            _, seat_id, row = key.split("_")
 
             row = int(row)
-            seat = int(seat)
-
 
             if row == 12:
                 continue
 
 
+            real_seat = seat_map.get(
+                seat_id,
+                seat_id
+            )
+
+
             seats.setdefault(
                 row,
                 []
-            ).append(seat)
+            ).append(
+                int(real_seat)
+            )
 
 
         except Exception:
@@ -200,7 +273,7 @@ def get_free_seats(data):
 
 
 
-def generate_html(events):
+def generate_html(events, seat_map):
 
     now = datetime.now().strftime(
         "%d.%m.%Y %H:%M"
@@ -302,7 +375,8 @@ Aktualizováno: {now}
 
 
             seats = get_free_seats(
-                data
+                data,
+                seat_map
             )
 
 
@@ -395,6 +469,9 @@ def main():
     )
 
 
+    seat_map = get_seat_map()
+
+
     events = get_events()
 
 
@@ -405,7 +482,8 @@ def main():
 
 
     html = generate_html(
-        events
+        events,
+        seat_map
     )
 
 
