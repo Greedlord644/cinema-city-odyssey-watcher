@@ -1,115 +1,92 @@
 import requests
+import os
+import json
+from datetime import datetime
 
 
 PRESENTATION_ID = "220780"
 
-VENUE_TYPE_ID = "1"
-
-
 SEATS_URL = (
-    "https://tickets.cinemacity.cz/api/seats/"
-    "seats-statusV2"
+    "https://tickets.cinemacity.cz/api/seats/seats-statusV2"
 )
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+
+
+# podmínky:
+# - ignorovat řady 1-5
+# - ignorovat řadu 12
+# - ignorovat krajních 10 míst zleva/zprava
+# - hledat pouze 2 sousední volná místa
 
 
 def get_seats():
 
     params = {
         "presentationId": PRESENTATION_ID,
-        "venueTypeId": VENUE_TYPE_ID,
+        "venueTypeId": "1",
         "isReserved": "1"
     }
 
-headers = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 "
-        "(KHTML, like Gecko) "
-        "Chrome/126.0.0.0 Safari/537.36"
-    ),
-    "Accept": "application/json, text/plain, */*",
-    "Referer": (
-        "https://www.cinemacity.cz/"
-    ),
-    "Origin": (
-        "https://www.cinemacity.cz"
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 "
+            "(KHTML, like Gecko) "
+            "Chrome/126.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://tickets.cinemacity.cz/",
+        "Origin": "https://tickets.cinemacity.cz"
+    }
+
+    response = requests.get(
+        SEATS_URL,
+        params=params,
+        headers=headers,
+        timeout=15
     )
-}
-
-
-response = requests.get(
-    SEATS_URL,
-    params=params,
-    headers=headers,
-    timeout=15
-)
 
     response.raise_for_status()
 
-    return response.json()["seats"]
-
+    return response.json()
 
 
 def parse_seats(data):
 
-    free = []
+    seats = data.get("seats", {})
 
-    for seat_id, status in data.items():
+    available = []
 
-        if status == 0:
+    for key, status in seats.items():
 
-            parts = seat_id.split("_")
+        if status != 0:
+            continue
 
-            seat_number = int(parts[1])
-            row = int(parts[2])
+        try:
+            cinema, seat, row = key.split("_")
 
-            free.append(
+            available.append(
                 {
-                    "row": row,
-                    "seat": seat_number
+                    "seat": int(seat),
+                    "row": int(row)
                 }
             )
 
-    return free
+        except Exception:
+            continue
+
+    return available
 
 
+def find_good_pairs(seats):
 
-def is_allowed(row, seat):
-
-    # ignorujeme první řady
-    if row <= 5:
-        return False
-
-    # ignorujeme poslední řadu
-    if row == 12:
-        return False
-
-    # zatím jednoduchý filtr krajů
-    if seat <= 10:
-        return False
-
-    if seat >= 31:
-        return False
-
-    return True
-
-
-
-def find_pairs(seats):
-
-    result = []
+    good_pairs = []
 
     rows = {}
 
     for seat in seats:
-
-        if not is_allowed(
-            seat["row"],
-            seat["seat"]
-        ):
-            continue
-
-
         rows.setdefault(
             seat["row"],
             []
@@ -120,78 +97,115 @@ def find_pairs(seats):
 
     for row, numbers in rows.items():
 
+        # ignorované řady
+        if row <= 5:
+            continue
+
+        if row == 12:
+            continue
+
+
         numbers.sort()
 
-        for i in range(
-            len(numbers) - 1
-        ):
 
-            if numbers[i + 1] == numbers[i] + 1:
+        for i in range(len(numbers)-1):
 
-                result.append(
-                    {
-                        "row": row,
-                        "seats": [
-                            numbers[i],
-                            numbers[i + 1]
-                        ]
-                    }
-                )
+            first = numbers[i]
+            second = numbers[i+1]
 
 
-    return result
+            # musí být vedle sebe
+            if second != first + 1:
+                continue
 
+
+            # ignorace krajů
+            if first <= 10:
+                continue
+
+            # předpoklad šířky sálu - pravý kraj
+            if second >= 35:
+                continue
+
+
+            good_pairs.append(
+                {
+                    "row": row,
+                    "seats": [
+                        first,
+                        second
+                    ]
+                }
+            )
+
+
+    return good_pairs
+
+
+def send_telegram(message):
+
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        print("Telegram není nastaven")
+        return
+
+
+    url = (
+        f"https://api.telegram.org/"
+        f"bot{TELEGRAM_TOKEN}/sendMessage"
+    )
+
+    requests.post(
+        url,
+        json={
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": message
+        },
+        timeout=10
+    )
 
 
 def main():
 
+    print("Cinema City seat checker")
     print(
-        "Cinema City seat checker test"
+        "Presentation:",
+        PRESENTATION_ID
     )
-
-    print(
-        f"Presentation: {PRESENTATION_ID}"
-    )
-
 
     data = get_seats()
 
-
-    free = parse_seats(
-        data
-    )
-
+    seats = parse_seats(data)
 
     print(
-        f"Free seats: {len(free)}"
+        "Available seats:",
+        len(seats)
     )
 
-
-    pairs = find_pairs(
-        free
-    )
+    pairs = find_good_pairs(seats)
 
 
     if pairs:
 
-        print(
-            "\nFOUND SUITABLE PAIRS:"
+        message = (
+            "🎬 IMAX Flora - nalezena vhodná místa!\n\n"
         )
 
         for pair in pairs:
-
-            print(
-                f"Row {pair['row']} "
-                f"Seats {pair['seats'][0]} "
-                f"+ {pair['seats'][1]}"
+            message += (
+                f"Řada {pair['row']}, "
+                f"místa {pair['seats'][0]} + "
+                f"{pair['seats'][1]}\n"
             )
+
+        print(message)
+
+        send_telegram(message)
 
     else:
 
         print(
-            "No suitable pairs found"
+            "Nenalezena žádná vhodná dvojice."
         )
-
 
 
 if __name__ == "__main__":
