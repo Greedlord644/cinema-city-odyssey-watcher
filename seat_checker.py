@@ -9,10 +9,38 @@ SEATS_URL = (
 )
 
 
+def parse_cookies(cookie_string):
+
+    cookies = {}
+
+    for item in cookie_string.split(";"):
+
+        item = item.strip()
+
+        if "=" not in item:
+            continue
+
+        key, value = item.split("=", 1)
+
+        cookies[key] = value
+
+    return cookies
+
+
+
 def get_seats():
 
-    cookies = os.environ["CINEMA_COOKIES"]
+    cookies_raw = os.environ["CINEMA_COOKIES"]
     uuid = os.environ["CINEMA_UUID"]
+
+    cookies = parse_cookies(
+        cookies_raw
+    )
+
+    print(
+        "Cookies loaded:",
+        len(cookies)
+    )
 
     params = {
         "presentationId": PRESENTATION_ID,
@@ -40,10 +68,7 @@ def get_seats():
         SEATS_URL,
         params=params,
         headers=headers,
-        cookies={
-            item.split("=", 1)[0]: item.split("=", 1)[1]
-            for item in cookies.split("; ")
-        },
+        cookies=cookies,
         timeout=15
     )
 
@@ -108,7 +133,7 @@ def find_pairs(seats):
         for i in range(len(numbers)-1):
 
             first = numbers[i]
-            second = numbers[i+1]
+            second = numbers[i + 1]
 
             if second != first + 1:
                 continue
@@ -144,7 +169,6 @@ def main():
         PRESENTATION_ID
     )
 
-
     data = get_seats()
 
     seats = parse_seats(
@@ -156,11 +180,9 @@ def main():
         len(seats)
     )
 
-
     pairs = find_pairs(
         seats
     )
-
 
     if pairs:
 
@@ -181,7 +203,6 @@ def main():
         print(
             "No suitable pairs found"
         )
-
 
 
 if __name__ == "__main__":
