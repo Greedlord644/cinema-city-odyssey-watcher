@@ -20,6 +20,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
 
       - name: Setup Python
@@ -50,5 +52,7 @@ jobs:
           git add docs/index.html
 
           git diff --cached --quiet || git commit -m "Update IMAX dashboard"
+
+          git pull --rebase
 
           git push
