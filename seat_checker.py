@@ -9,6 +9,11 @@ CINEMA_ID = "1052"
 DAYS_TO_CHECK = 45
 
 
+FILM_URL = (
+    "https://www.cinemacity.cz/films/odyssea/7268s2r"
+)
+
+
 EVENTS_API = (
     "https://www.cinemacity.cz/cz/data-api-service/v1/"
     "quickbook/10101/cinema-events/in-group/prague/"
@@ -20,6 +25,7 @@ SEATS_API = (
     "https://tickets.cinemacity.cz/api/seats/"
     "seats-statusV2"
 )
+
 
 
 def parse_cookies(cookie_string):
@@ -76,6 +82,30 @@ def format_datetime(value):
     return dt.strftime(
         "%d.%m.%Y %H:%M"
     )
+
+
+
+def send_telegram(message):
+
+    token = os.environ["TELEGRAM_TOKEN"]
+    chat_id = os.environ["TELEGRAM_CHAT_ID"]
+
+    url = (
+        f"https://api.telegram.org/"
+        f"bot{token}/sendMessage"
+    )
+
+    response = requests.post(
+        url,
+        json={
+            "chat_id": chat_id,
+            "text": message,
+            "disable_web_page_preview": True
+        },
+        timeout=15
+    )
+
+    response.raise_for_status()
 
 
 
@@ -136,8 +166,7 @@ def get_imax_events():
                 events.append(
                     {
                         "id": event["id"],
-                        "date": event["eventDateTime"],
-                        "hall": event.get("auditorium")
+                        "date": event["eventDateTime"]
                     }
                 )
 
@@ -203,20 +232,21 @@ def parse_free_seats(data):
 
 def is_allowed(row, seat):
 
-    # ignorovat první řady
     if row <= 5:
         return False
 
-    # ignorovat řadu pro vozíčkáře
+
     if row == 12:
         return False
 
-    # ignorovat krajních 10 míst
+
     if seat <= 10:
         return False
 
+
     if seat >= 31:
         return False
+
 
     return True
 
@@ -254,7 +284,7 @@ def find_pairs(seats):
         for i in range(len(numbers)-1):
 
             first = numbers[i]
-            second = numbers[i+1]
+            second = numbers[i + 1]
 
 
             if second == first + 1:
@@ -290,10 +320,13 @@ def main():
     )
 
 
+    notifications = []
+
+
     for event in events:
 
         print(
-            "\nKontrola:",
+            "Kontrola:",
             event["id"],
             format_datetime(event["date"])
         )
@@ -316,26 +349,16 @@ def main():
             )
 
 
-            if pairs:
+            for pair in pairs:
 
-                print(
-                    "NALEZENA VHODNÁ MÍSTA:"
-                )
-
-
-                for pair in pairs:
-
-                    print(
-                        f"Řada {pair['row']}, "
-                        f"místa "
-                        f"{pair['seats'][0]} + "
-                        f"{pair['seats'][1]}"
-                    )
-
-            else:
-
-                print(
-                    "Nejsou žádná vhodná místa"
+                notifications.append(
+                    {
+                        "date": format_datetime(
+                            event["date"]
+                        ),
+                        "row": pair["row"],
+                        "seats": pair["seats"]
+                    }
                 )
 
 
@@ -345,6 +368,47 @@ def main():
                 "CHYBA:",
                 error
             )
+
+
+    if notifications:
+
+        message = (
+            "🎬 Uvolněná místa IMAX Odyssea\n\n"
+            "🏛 Cinema City Flora\n\n"
+        )
+
+
+        for item in notifications:
+
+            message += (
+                f"📅 {item['date']}\n"
+                f"💺 Řada {item['row']}, "
+                f"místa "
+                f"{item['seats'][0]} + "
+                f"{item['seats'][1]}\n\n"
+            )
+
+
+        message += (
+            "🔗 "
+            + FILM_URL
+        )
+
+
+        send_telegram(
+            message
+        )
+
+        print(
+            "Telegram notifikace odeslána"
+        )
+
+
+    else:
+
+        print(
+            "Nejsou žádná vhodná místa"
+        )
 
 
 
