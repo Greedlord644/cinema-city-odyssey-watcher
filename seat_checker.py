@@ -67,6 +67,18 @@ def get_cookies():
 
 
 
+def format_datetime(value):
+
+    dt = datetime.fromisoformat(
+        value.replace("Z", "+00:00")
+    )
+
+    return dt.strftime(
+        "%d.%m.%Y %H:%M"
+    )
+
+
+
 def get_imax_events():
 
     events = []
@@ -191,24 +203,20 @@ def parse_free_seats(data):
 
 def is_allowed(row, seat):
 
-    # přední řady
+    # ignorovat první řady
     if row <= 5:
         return False
 
-
-    # vozíčkářská řada
+    # ignorovat řadu pro vozíčkáře
     if row == 12:
         return False
 
-
-    # krajní místa
+    # ignorovat krajních 10 míst
     if seat <= 10:
         return False
 
-
     if seat >= 31:
         return False
-
 
     return True
 
@@ -269,7 +277,7 @@ def find_pairs(seats):
 def main():
 
     print(
-        "Cinema City IMAX seat checker"
+        "Kontrola míst Cinema City IMAX"
     )
 
 
@@ -277,7 +285,7 @@ def main():
 
 
     print(
-        "IMAX events found:",
+        "Nalezeno IMAX 70mm projekcí:",
         len(events)
     )
 
@@ -285,9 +293,9 @@ def main():
     for event in events:
 
         print(
-            "\nChecking:",
+            "\nKontrola:",
             event["id"],
-            event["date"]
+            format_datetime(event["date"])
         )
 
 
@@ -311,15 +319,15 @@ def main():
             if pairs:
 
                 print(
-                    "FOUND SUITABLE PAIRS:"
+                    "NALEZENA VHODNÁ MÍSTA:"
                 )
 
 
                 for pair in pairs:
 
                     print(
-                        f"Row {pair['row']} "
-                        f"Seats "
+                        f"Řada {pair['row']}, "
+                        f"místa "
                         f"{pair['seats'][0]} + "
                         f"{pair['seats'][1]}"
                     )
@@ -327,14 +335,14 @@ def main():
             else:
 
                 print(
-                    "No suitable pairs"
+                    "Nejsou žádná vhodná místa"
                 )
 
 
         except Exception as error:
 
             print(
-                "ERROR:",
+                "CHYBA:",
                 error
             )
 
