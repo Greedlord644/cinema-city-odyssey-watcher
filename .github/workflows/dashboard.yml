@@ -1,0 +1,57 @@
+name: Generate IMAX Dashboard
+
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: "*/10 * * * *"
+
+
+permissions:
+  contents: write
+
+
+jobs:
+
+  dashboard:
+
+    runs-on: ubuntu-latest
+
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+
+      - name: Install dependencies
+        run: |
+          pip install requests
+
+
+      - name: Generate dashboard
+        env:
+          CINEMA_COOKIES: ${{ secrets.CINEMA_COOKIES }}
+          CINEMA_UUID: ${{ secrets.CINEMA_UUID }}
+
+        run: |
+          python film_dashboard.py
+
+
+      - name: Save dashboard
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add docs/index.html
+
+          git diff --cached --quiet || git commit -m "Update IMAX dashboard"
+
+          git push
