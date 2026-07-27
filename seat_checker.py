@@ -1,11 +1,24 @@
 import requests
 import os
+from datetime import datetime, timedelta
 
 
-PRESENTATION_ID = "220780"
+FILM_ID = "7268s2r"
+CINEMA_ID = "1052"
 
-SEATS_URL = (
-    "https://tickets.cinemacity.cz/api/seats/seats-statusV2"
+DAYS_TO_CHECK = 45
+
+
+EVENTS_API = (
+    "https://www.cinemacity.cz/cz/data-api-service/v1/"
+    "quickbook/10101/cinema-events/in-group/prague/"
+    f"with-film/{FILM_ID}/at-date/"
+)
+
+
+SEATS_API = (
+    "https://tickets.cinemacity.cz/api/seats/"
+    "seats-statusV2"
 )
 
 
@@ -28,33 +41,13 @@ def parse_cookies(cookie_string):
 
 
 
-def get_seats():
+def get_headers():
 
-    cookies_raw = os.environ["CINEMA_COOKIES"]
     uuid = os.environ["CINEMA_UUID"]
 
-    cookies = parse_cookies(
-        cookies_raw
-    )
-
-    print(
-        "Cookies loaded:",
-        len(cookies)
-    )
-
-    params = {
-        "presentationId": PRESENTATION_ID,
-        "venueTypeId": "1",
-        "isReserved": "1"
-    }
-
-    headers = {
+    return {
         "accept": "application/json, text/plain, */*",
         "accept-language": "cs-CZ,cs;q=0.9",
-        "referer": (
-            f"https://tickets.cinemacity.cz/"
-            f"order/{PRESENTATION_ID}?lang=cs"
-        ),
         "user-agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 "
@@ -64,43 +57,160 @@ def get_seats():
         "uuid": uuid
     }
 
+
+
+def get_cookies():
+
+    return parse_cookies(
+        os.environ["CINEMA_COOKIES"]
+    )
+
+
+
+def get_imax_events():
+
+    events = []
+
+    start = datetime.now()
+
+
+    for i in range(DAYS_TO_CHECK):
+
+        date = (
+            start + timedelta(days=i)
+        ).strftime("%Y-%m-%d")
+
+
+        url = (
+            EVENTS_API
+            + date
+            + "?attr=&lang=cs_CZ"
+        )
+
+
+        response = requests.get(
+            url,
+            timeout=15
+        )
+
+        response.raise_for_status()
+
+
+        data = response.json()
+
+
+        for event in (
+            data
+            .get("body", {})
+            .get("events", [])
+        ):
+
+            if str(event.get("cinemaId")) != CINEMA_ID:
+                continue
+
+
+            attributes = event.get(
+                "attributeIds",
+                []
+            )
+
+
+            if (
+                "70-mm" in attributes
+                and "subbed" in attributes
+                and "original-lang-en" in attributes
+            ):
+
+                events.append(
+                    {
+                        "id": event["id"],
+                        "date": event["eventDateTime"],
+                        "hall": event.get("auditorium")
+                    }
+                )
+
+
+    return events
+
+
+
+def get_seats(presentation_id):
+
+    params = {
+        "presentationId": presentation_id,
+        "venueTypeId": "1",
+        "isReserved": "1"
+    }
+
+
     response = requests.get(
-        SEATS_URL,
+        SEATS_API,
         params=params,
-        headers=headers,
-        cookies=cookies,
+        headers=get_headers(),
+        cookies=get_cookies(),
         timeout=15
     )
 
-    print(
-        "STATUS:",
-        response.status_code
-    )
 
     response.raise_for_status()
+
 
     return response.json()
 
 
 
-def parse_seats(data):
+def parse_free_seats(data):
 
-    available = []
+    result = []
 
-    for key, status in data["seats"].items():
 
-        if status == 0:
+    for key, status in data.get("seats", {}).items():
+
+        if status != 0:
+            continue
+
+
+        try:
 
             _, seat, row = key.split("_")
 
-            available.append(
+            result.append(
                 {
                     "row": int(row),
                     "seat": int(seat)
                 }
             )
 
-    return available
+        except Exception:
+            continue
+
+
+    return result
+
+
+
+def is_allowed(row, seat):
+
+    # přední řady
+    if row <= 5:
+        return False
+
+
+    # vozíčkářská řada
+    if row == 12:
+        return False
+
+
+    # krajní místa
+    if seat <= 10:
+        return False
+
+
+    if seat >= 31:
+        return False
+
+
+    return True
 
 
 
@@ -110,7 +220,15 @@ def find_pairs(seats):
 
     rows = {}
 
+
     for seat in seats:
+
+        if not is_allowed(
+            seat["row"],
+            seat["seat"]
+        ):
+            continue
+
 
         rows.setdefault(
             seat["row"],
@@ -122,37 +240,27 @@ def find_pairs(seats):
 
     for row, numbers in rows.items():
 
-        if row <= 5:
-            continue
-
-        if row == 12:
-            continue
-
         numbers.sort()
+
 
         for i in range(len(numbers)-1):
 
             first = numbers[i]
-            second = numbers[i + 1]
+            second = numbers[i+1]
 
-            if second != first + 1:
-                continue
 
-            if first <= 10:
-                continue
+            if second == first + 1:
 
-            if second >= 35:
-                continue
+                pairs.append(
+                    {
+                        "row": row,
+                        "seats": [
+                            first,
+                            second
+                        ]
+                    }
+                )
 
-            pairs.append(
-                {
-                    "row": row,
-                    "seats": (
-                        first,
-                        second
-                    )
-                }
-            )
 
     return pairs
 
@@ -161,48 +269,75 @@ def find_pairs(seats):
 def main():
 
     print(
-        "Cinema City seat checker"
+        "Cinema City IMAX seat checker"
     )
+
+
+    events = get_imax_events()
+
 
     print(
-        "Presentation:",
-        PRESENTATION_ID
+        "IMAX events found:",
+        len(events)
     )
 
-    data = get_seats()
 
-    seats = parse_seats(
-        data
-    )
-
-    print(
-        "Free seats:",
-        len(seats)
-    )
-
-    pairs = find_pairs(
-        seats
-    )
-
-    if pairs:
+    for event in events:
 
         print(
-            "FOUND SUITABLE PAIRS:"
+            "\nChecking:",
+            event["id"],
+            event["date"]
         )
 
-        for pair in pairs:
 
-            print(
-                f"Row {pair['row']} "
-                f"Seats {pair['seats'][0]} + "
-                f"{pair['seats'][1]}"
+        try:
+
+            data = get_seats(
+                event["id"]
             )
 
-    else:
 
-        print(
-            "No suitable pairs found"
-        )
+            free = parse_free_seats(
+                data
+            )
+
+
+            pairs = find_pairs(
+                free
+            )
+
+
+            if pairs:
+
+                print(
+                    "FOUND SUITABLE PAIRS:"
+                )
+
+
+                for pair in pairs:
+
+                    print(
+                        f"Row {pair['row']} "
+                        f"Seats "
+                        f"{pair['seats'][0]} + "
+                        f"{pair['seats'][1]}"
+                    )
+
+            else:
+
+                print(
+                    "No suitable pairs"
+                )
+
+
+        except Exception as error:
+
+            print(
+                "ERROR:",
+                error
+            )
+
 
 
 if __name__ == "__main__":
