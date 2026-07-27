@@ -20,11 +20,29 @@ def get_seats():
         "isReserved": "1"
     }
 
-    response = requests.get(
-        SEATS_URL,
-        params=params,
-        timeout=15
+headers = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 "
+        "(KHTML, like Gecko) "
+        "Chrome/126.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Referer": (
+        "https://www.cinemacity.cz/"
+    ),
+    "Origin": (
+        "https://www.cinemacity.cz"
     )
+}
+
+
+response = requests.get(
+    SEATS_URL,
+    params=params,
+    headers=headers,
+    timeout=15
+)
 
     response.raise_for_status()
 
