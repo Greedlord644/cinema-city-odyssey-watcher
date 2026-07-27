@@ -1,5 +1,6 @@
 import requests
 import os
+import json
 from datetime import datetime, timedelta
 
 
@@ -8,6 +9,7 @@ CINEMA_ID = "1052"
 
 DAYS_TO_CHECK = 45
 
+STATE_FILE = "seats_state.json"
 
 FILM_URL = (
     "https://www.cinemacity.cz/films/odyssea/7268s2r"
@@ -25,6 +27,36 @@ SEATS_API = (
     "https://tickets.cinemacity.cz/api/seats/"
     "seats-statusV2"
 )
+
+
+
+def load_state():
+
+    if not os.path.exists(STATE_FILE):
+        return {}
+
+    with open(
+        STATE_FILE,
+        "r",
+        encoding="utf-8"
+    ) as file:
+        return json.load(file)
+
+
+
+def save_state(state):
+
+    with open(
+        STATE_FILE,
+        "w",
+        encoding="utf-8"
+    ) as file:
+        json.dump(
+            state,
+            file,
+            indent=2,
+            ensure_ascii=False
+        )
 
 
 
@@ -49,8 +81,6 @@ def parse_cookies(cookie_string):
 
 def get_headers():
 
-    uuid = os.environ["CINEMA_UUID"]
-
     return {
         "accept": "application/json, text/plain, */*",
         "accept-language": "cs-CZ,cs;q=0.9",
@@ -60,7 +90,7 @@ def get_headers():
             "(KHTML, like Gecko) "
             "Chrome/150.0.0.0 Safari/537.36"
         ),
-        "uuid": uuid
+        "uuid": os.environ["CINEMA_UUID"]
     }
 
 
@@ -87,18 +117,15 @@ def format_datetime(value):
 
 def send_telegram(message):
 
-    token = os.environ["TELEGRAM_TOKEN"]
-    chat_id = os.environ["TELEGRAM_CHAT_ID"]
-
     url = (
-        f"https://api.telegram.org/"
-        f"bot{token}/sendMessage"
+        "https://api.telegram.org/"
+        f"bot{os.environ['TELEGRAM_TOKEN']}/sendMessage"
     )
 
     response = requests.post(
         url,
         json={
-            "chat_id": chat_id,
+            "chat_id": os.environ["TELEGRAM_CHAT_ID"],
             "text": message,
             "disable_web_page_preview": True
         },
@@ -136,7 +163,6 @@ def get_imax_events():
         )
 
         response.raise_for_status()
-
 
         data = response.json()
 
@@ -195,7 +221,6 @@ def get_seats(presentation_id):
 
     response.raise_for_status()
 
-
     return response.json()
 
 
@@ -235,18 +260,14 @@ def is_allowed(row, seat):
     if row <= 5:
         return False
 
-
     if row == 12:
         return False
-
 
     if seat <= 10:
         return False
 
-
     if seat >= 31:
         return False
-
 
     return True
 
@@ -304,12 +325,29 @@ def find_pairs(seats):
 
 
 
-def main():
+def create_alert_id(event, pair):
 
+    return (
+        f"{event['id']}_"
+        f"{pair['row']}_"
+        f"{pair['seats'][0]}_"
+        f"{pair['seats'][1]}"
+    )
+
+
+
+def main():
 
     print(
         "Kontrola míst Cinema City IMAX"
     )
+
+
+    old_state = load_state()
+
+    new_state = {}
+
+    notifications = []
 
 
     events = get_imax_events()
@@ -319,9 +357,6 @@ def main():
         "Nalezeno IMAX 70mm projekcí:",
         len(events)
     )
-
-
-    notifications = []
 
 
     for event in events:
@@ -352,15 +387,24 @@ def main():
 
             for pair in pairs:
 
-                notifications.append(
-                    {
-                        "date": format_datetime(
-                            event["date"]
-                        ),
-                        "row": pair["row"],
-                        "seats": pair["seats"]
-                    }
+                alert_id = create_alert_id(
+                    event,
+                    pair
                 )
+
+
+                new_state[alert_id] = {
+                    "date": format_datetime(event["date"]),
+                    "row": pair["row"],
+                    "seats": pair["seats"]
+                }
+
+
+                if alert_id not in old_state:
+
+                    notifications.append(
+                        new_state[alert_id]
+                    )
 
 
         except Exception as error:
@@ -369,6 +413,11 @@ def main():
                 "CHYBA:",
                 error
             )
+
+
+    save_state(
+        new_state
+    )
 
 
     if notifications:
@@ -400,6 +449,7 @@ def main():
             message
         )
 
+
         print(
             "Telegram notifikace odeslána"
         )
@@ -408,7 +458,7 @@ def main():
     else:
 
         print(
-            "Nejsou žádná vhodná místa"
+            "Nejsou žádná nová vhodná místa"
         )
 
 
