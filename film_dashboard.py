@@ -235,12 +235,10 @@ h1 {{
     color: #666;
 }}
 
-
 .plan {{
     margin-top: 25px;
     text-align: center;
 }}
-
 
 .plan img {{
     max-width: 100%;
@@ -249,7 +247,6 @@ h1 {{
     border-radius: 8px;
 }}
 
-
 .card {{
     border: 1px solid #ddd;
     border-radius: 8px;
@@ -257,6 +254,9 @@ h1 {{
     margin-top: 20px;
 }}
 
+.card.good {{
+    background-color: #f4fbf4;
+}}
 
 .row {{
     margin-top: 8px;
@@ -313,8 +313,21 @@ Aktualizováno: {now}
             shown_events += 1
 
 
+            has_better_seats = any(
+                row >= 5 and row < 12
+                for row in seats
+            )
+
+
+            card_class = (
+                "card good"
+                if has_better_seats
+                else "card"
+            )
+
+
             html += f"""
-<div class="card">
+<div class="{card_class}">
 
 <h2>
 {format_datetime(event["date"])}
