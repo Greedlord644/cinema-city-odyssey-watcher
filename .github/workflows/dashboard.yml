@@ -4,9 +4,6 @@ name: Generate IMAX Dashboard
 on:
   workflow_dispatch:
 
-  schedule:
-    - cron: "*/10 * * * *"
-
 
 permissions:
   contents: write
