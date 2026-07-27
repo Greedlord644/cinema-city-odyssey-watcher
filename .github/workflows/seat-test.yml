@@ -32,10 +32,3 @@ jobs:
       - name: Run seat checker
         run: |
           python seat_checker.py
-
-
-      - name: Upload response
-        uses: actions/upload-artifact@v4
-        with:
-          name: seat-response
-          path: seat_response.json
