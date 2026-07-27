@@ -80,6 +80,7 @@ def get_events():
 
     start = datetime.now()
 
+
     for i in range(DAYS_TO_CHECK):
 
         date = (
@@ -133,7 +134,9 @@ def get_events():
                     }
                 )
 
+
     return events
+
 
 
 def get_seats(presentation_id):
@@ -159,6 +162,7 @@ def get_seats(presentation_id):
     return response.json()
 
 
+
 def get_free_seats(data):
 
     seats = {}
@@ -178,7 +182,6 @@ def get_free_seats(data):
             seat = int(seat)
 
 
-            # ignorovat vozickarskou radu
             if row == 12:
                 continue
 
@@ -194,6 +197,7 @@ def get_free_seats(data):
 
 
     return seats
+
 
 
 def generate_html(events):
@@ -213,6 +217,7 @@ def generate_html(events):
 
 <title>Odyssea IMAX 70mm Flora</title>
 
+
 <style>
 
 body {{
@@ -230,12 +235,28 @@ h1 {{
     color: #666;
 }}
 
+
+.plan {{
+    margin-top: 25px;
+    text-align: center;
+}}
+
+
+.plan img {{
+    max-width: 100%;
+    height: auto;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}}
+
+
 .card {{
     border: 1px solid #ddd;
     border-radius: 8px;
     padding: 15px;
     margin-top: 20px;
 }}
+
 
 .row {{
     margin-top: 8px;
@@ -251,9 +272,19 @@ h1 {{
 
 <h1>🎬 Odyssea – IMAX 70mm Flora</h1>
 
+
 <p class="updated">
 Aktualizováno: {now}
 </p>
+
+
+<div class="plan">
+
+<h2>Plánek sálu</h2>
+
+<img src="seating-plan.png" alt="Plánek IMAX sálu">
+
+</div>
 
 """
 
@@ -275,8 +306,6 @@ Aktualizováno: {now}
             )
 
 
-            # pokud nejsou žádná volná místa,
-            # tento termín vůbec nezobrazovat
             if not seats:
                 continue
 
@@ -328,7 +357,7 @@ Aktualizováno: {now}
 
         html += """
 <div class="card">
-Žádné dostupné volné místo.
+Žádná dostupná volná místa.
 </div>
 """
 
@@ -343,6 +372,7 @@ Aktualizováno: {now}
 
 
     return html
+
 
 
 def main():
@@ -386,6 +416,7 @@ def main():
     print(
         "Dashboard generated"
     )
+
 
 
 if __name__ == "__main__":
