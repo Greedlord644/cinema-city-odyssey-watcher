@@ -24,7 +24,6 @@ SEATS_API = (
 )
 
 
-
 def parse_cookies(cookie_string):
 
     cookies = {}
@@ -43,7 +42,6 @@ def parse_cookies(cookie_string):
     return cookies
 
 
-
 def get_headers():
 
     return {
@@ -52,12 +50,10 @@ def get_headers():
         "user-agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 "
-            "(KHTML, like Gecko) "
             "Chrome/150.0.0.0 Safari/537.36"
         ),
         "uuid": os.environ["CINEMA_UUID"]
     }
-
 
 
 def get_cookies():
@@ -65,7 +61,6 @@ def get_cookies():
     return parse_cookies(
         os.environ["CINEMA_COOKIES"]
     )
-
 
 
 def format_datetime(value):
@@ -79,13 +74,11 @@ def format_datetime(value):
     )
 
 
-
 def get_events():
 
     events = []
 
     start = datetime.now()
-
 
     for i in range(DAYS_TO_CHECK):
 
@@ -140,9 +133,7 @@ def get_events():
                     }
                 )
 
-
     return events
-
 
 
 def get_seats(presentation_id):
@@ -168,7 +159,6 @@ def get_seats(presentation_id):
     return response.json()
 
 
-
 def get_free_seats(data):
 
     seats = {}
@@ -188,7 +178,7 @@ def get_free_seats(data):
             seat = int(seat)
 
 
-            # ignorovat vozíčkářskou řadu
+            # ignorovat vozickarskou radu
             if row == 12:
                 continue
 
@@ -196,9 +186,7 @@ def get_free_seats(data):
             seats.setdefault(
                 row,
                 []
-            ).append(
-                seat
-            )
+            ).append(seat)
 
 
         except Exception:
@@ -206,7 +194,6 @@ def get_free_seats(data):
 
 
     return seats
-
 
 
 def generate_html(events):
@@ -244,18 +231,14 @@ h1 {{
 }}
 
 .card {{
-
     border: 1px solid #ddd;
     border-radius: 8px;
     padding: 15px;
     margin-top: 20px;
-
 }}
 
 .row {{
-
     margin-top: 8px;
-
 }}
 
 </style>
@@ -275,26 +258,10 @@ Aktualizováno: {now}
 """
 
 
-    if not events:
-
-        html += """
-<div class="card">
-Žádné dostupné projekce.
-</div>
-"""
+    shown_events = 0
 
 
     for event in events:
-
-        html += f"""
-<div class="card">
-
-<h2>
-{format_datetime(event["date"])}
-</h2>
-
-"""
-
 
         try:
 
@@ -308,49 +275,60 @@ Aktualizováno: {now}
             )
 
 
+            # pokud nejsou žádná volná místa,
+            # tento termín vůbec nezobrazovat
             if not seats:
-
-                html += """
-<p>
-Žádná volná místa.
-</p>
-"""
+                continue
 
 
-            else:
+            shown_events += 1
 
-                html += """
+
+            html += f"""
+<div class="card">
+
+<h2>
+{format_datetime(event["date"])}
+</h2>
+
 <h3>Volná místa:</h3>
 """
 
 
-                for row in sorted(seats):
+            for row in sorted(seats):
 
-                    numbers = ", ".join(
-                        map(
-                            str,
-                            sorted(seats[row])
-                        )
+                numbers = ", ".join(
+                    map(
+                        str,
+                        sorted(seats[row])
                     )
+                )
 
 
-                    html += f"""
+                html += f"""
 <div class="row">
 <b>Řada {row}:</b> {numbers}
 </div>
 """
 
 
-        except Exception as error:
-
-            html += f"""
-<p>
-Chyba při načítání míst: {error}
-</p>
+            html += """
+</div>
 """
 
 
+        except Exception as error:
+
+            print(
+                f"Seat error {event['id']}: {error}"
+            )
+
+
+    if shown_events == 0:
+
         html += """
+<div class="card">
+Žádné dostupné volné místo.
 </div>
 """
 
@@ -365,7 +343,6 @@ Chyba při načítání míst: {error}
 
 
     return html
-
 
 
 def main():
@@ -409,7 +386,6 @@ def main():
     print(
         "Dashboard generated"
     )
-
 
 
 if __name__ == "__main__":
