@@ -1,4 +1,5 @@
 import os
+import json
 import requests
 from datetime import datetime, timedelta
 
@@ -22,18 +23,6 @@ SEATS_API = (
     "https://tickets.cinemacity.cz/api/seats/"
     "seats-statusV2"
 )
-
-
-SEATPLAN_API = (
-    "https://tickets.cinemacity.cz/api/seats/"
-    "seatplanV2"
-)
-
-
-SEATPLAN_PARAMS = {
-    "venueId": "80",
-    "seatplanId": "1"
-}
 
 
 def parse_cookies(cookie_string):
@@ -181,29 +170,22 @@ def get_seats(presentation_id):
 
 def get_seat_map():
 
-    response = requests.get(
-        SEATPLAN_API,
-        params=SEATPLAN_PARAMS,
-        headers=get_headers(),
-        cookies=get_cookies(),
-        timeout=15
-    )
+    with open(
+        "seatmap.json",
+        "r",
+        encoding="utf-8"
+    ) as file:
 
-
-    response.raise_for_status()
-
-    data = response.json()
+        data = json.load(file)
 
 
     seat_map = {}
 
 
-    def scan_seats(obj):
+    def scan(obj):
 
         if isinstance(obj, dict):
 
-            # seatplanV2 structure:
-            # ... R -> row -> S -> internal seat id -> n (real seat number)
             if "S" in obj and isinstance(obj["S"], dict):
 
                 for seat_id, seat_data in obj["S"].items():
@@ -213,26 +195,20 @@ def get_seat_map():
 
 
             for value in obj.values():
-                scan_seats(value)
+                scan(value)
 
 
         elif isinstance(obj, list):
 
             for item in obj:
-                scan_seats(item)
+                scan(item)
 
 
-    scan_seats(data)
+    scan(data)
 
-
-    print(
-        f"Seat map loaded: {len(seat_map)} seats",
-        flush=True
-    )
-
+    print(f"Seat map loaded: {len(seat_map)} seats", flush=True)
 
     return seat_map
-
 
 
 def get_free_seats(data, seat_map):
