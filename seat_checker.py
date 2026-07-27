@@ -306,11 +306,6 @@ def find_pairs(seats):
 
 def main():
 
-    # DOČASNÝ TEST TELEGRAMU
-    send_telegram(
-        "🧪 Test Telegramu - Seat Checker funguje."
-    )
-
 
     print(
         "Kontrola míst Cinema City IMAX"
