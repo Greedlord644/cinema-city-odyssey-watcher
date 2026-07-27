@@ -1,13 +1,16 @@
-name: Seat Checker Test
+name: Seat Checker
 
 
 on:
+  schedule:
+    - cron: "*/5 * * * *"
+
   workflow_dispatch:
 
 
 jobs:
 
-  test:
+  check:
 
     runs-on: ubuntu-latest
 
@@ -33,6 +36,8 @@ jobs:
         env:
           CINEMA_COOKIES: ${{ secrets.CINEMA_COOKIES }}
           CINEMA_UUID: ${{ secrets.CINEMA_UUID }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
         run: |
           python seat_checker.py
