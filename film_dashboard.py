@@ -198,26 +198,31 @@ def get_seat_map():
     seat_map = {}
 
 
-    def scan(obj):
+    def scan_seats(obj):
 
         if isinstance(obj, dict):
 
-            if "n" in obj and "id" in obj:
+            # seatplanV2 structure:
+            # ... R -> row -> S -> internal seat id -> n (real seat number)
+            if "S" in obj and isinstance(obj["S"], dict):
 
-                seat_map[str(obj["id"])] = str(obj["n"])
+                for seat_id, seat_data in obj["S"].items():
+
+                    if isinstance(seat_data, dict) and "n" in seat_data:
+                        seat_map[str(seat_id)] = str(seat_data["n"])
 
 
             for value in obj.values():
-                scan(value)
+                scan_seats(value)
 
 
         elif isinstance(obj, list):
 
             for item in obj:
-                scan(item)
+                scan_seats(item)
 
 
-    scan(data)
+    scan_seats(data)
 
 
     print(
