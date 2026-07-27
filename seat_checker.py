@@ -1,99 +1,179 @@
 import requests
-import json
 
 
-EVENT_ID = "212817"
+PRESENTATION_ID = "220780"
 
-URLS = [
-    f"https://tickets.cinemacity.cz/api/order/{EVENT_ID}?lang=cs",
-    f"https://tickets.cinemacity.cz/api/order/{EVENT_ID}",
-]
+VENUE_TYPE_ID = "1"
 
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 "
-        "(Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 "
-        "(KHTML, like Gecko) "
-        "Chrome/120 Safari/537.36"
-    ),
-    "Accept": "application/json,text/plain,*/*",
-}
+SEATS_URL = (
+    "https://tickets.cinemacity.cz/api/seats/"
+    "seats-statusV2"
+)
 
 
-def test_url(url):
+def get_seats():
 
-    print("\n==============================")
-    print("TEST:")
-    print(url)
-    print("==============================")
+    params = {
+        "presentationId": PRESENTATION_ID,
+        "venueTypeId": VENUE_TYPE_ID,
+        "isReserved": "1"
+    }
 
-    try:
+    response = requests.get(
+        SEATS_URL,
+        params=params,
+        timeout=15
+    )
 
-        response = requests.get(
-            url,
-            headers=HEADERS,
-            timeout=20,
-            allow_redirects=True
+    response.raise_for_status()
+
+    return response.json()["seats"]
+
+
+
+def parse_seats(data):
+
+    free = []
+
+    for seat_id, status in data.items():
+
+        if status == 0:
+
+            parts = seat_id.split("_")
+
+            seat_number = int(parts[1])
+            row = int(parts[2])
+
+            free.append(
+                {
+                    "row": row,
+                    "seat": seat_number
+                }
+            )
+
+    return free
+
+
+
+def is_allowed(row, seat):
+
+    # ignorujeme první řady
+    if row <= 5:
+        return False
+
+    # ignorujeme poslední řadu
+    if row == 12:
+        return False
+
+    # zatím jednoduchý filtr krajů
+    if seat <= 10:
+        return False
+
+    if seat >= 31:
+        return False
+
+    return True
+
+
+
+def find_pairs(seats):
+
+    result = []
+
+    rows = {}
+
+    for seat in seats:
+
+        if not is_allowed(
+            seat["row"],
+            seat["seat"]
+        ):
+            continue
+
+
+        rows.setdefault(
+            seat["row"],
+            []
+        ).append(
+            seat["seat"]
         )
 
-        print("STATUS:", response.status_code)
-        print("FINAL URL:", response.url)
-        print("CONTENT TYPE:", response.headers.get("content-type"))
 
-        print("\nFIRST 500 CHARACTERS:")
-        print(response.text[:500])
+    for row, numbers in rows.items():
 
+        numbers.sort()
 
-        try:
+        for i in range(
+            len(numbers) - 1
+        ):
 
-            data = response.json()
+            if numbers[i + 1] == numbers[i] + 1:
 
-            print("\nJSON FOUND")
-
-            with open(
-                "seat_response.json",
-                "w",
-                encoding="utf-8"
-            ) as file:
-
-                json.dump(
-                    data,
-                    file,
-                    indent=2,
-                    ensure_ascii=False
+                result.append(
+                    {
+                        "row": row,
+                        "seats": [
+                            numbers[i],
+                            numbers[i + 1]
+                        ]
+                    }
                 )
 
-            print(
-                "Saved as seat_response.json"
-            )
 
+    return result
 
-        except Exception:
-
-            print(
-                "Response is not JSON"
-            )
-
-
-    except Exception as error:
-
-        print(
-            "ERROR:",
-            error
-        )
 
 
 def main():
 
     print(
-        "Cinema City seat investigation"
+        "Cinema City seat checker test"
     )
 
-    for url in URLS:
+    print(
+        f"Presentation: {PRESENTATION_ID}"
+    )
 
-        test_url(url)
+
+    data = get_seats()
+
+
+    free = parse_seats(
+        data
+    )
+
+
+    print(
+        f"Free seats: {len(free)}"
+    )
+
+
+    pairs = find_pairs(
+        free
+    )
+
+
+    if pairs:
+
+        print(
+            "\nFOUND SUITABLE PAIRS:"
+        )
+
+        for pair in pairs:
+
+            print(
+                f"Row {pair['row']} "
+                f"Seats {pair['seats'][0]} "
+                f"+ {pair['seats'][1]}"
+            )
+
+    else:
+
+        print(
+            "No suitable pairs found"
+        )
+
 
 
 if __name__ == "__main__":
