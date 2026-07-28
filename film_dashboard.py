@@ -1,6 +1,7 @@
 import os
 import requests
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 
 FILM_ID = "7268s2r"
@@ -9,6 +10,8 @@ CINEMA_ID = "1052"
 DAYS_TO_CHECK = 45
 
 OUTPUT_FILE = "docs/index.html"
+
+PRAGUE_TZ = ZoneInfo("Europe/Prague")
 
 
 EVENTS_API = (
