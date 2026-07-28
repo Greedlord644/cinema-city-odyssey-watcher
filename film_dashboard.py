@@ -1,6 +1,6 @@
 import os
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 
@@ -81,7 +81,11 @@ def get_events():
 
     events = []
 
-    start = datetime.now()
+    start = datetime.now(
+        timezone.utc
+    ).astimezone(
+        PRAGUE_TZ
+    )
 
 
     for i in range(DAYS_TO_CHECK):
@@ -205,7 +209,11 @@ def get_free_seats(data):
 
 def generate_html(events):
 
-    now = datetime.now().strftime(
+    now = datetime.now(
+        timezone.utc
+    ).astimezone(
+        PRAGUE_TZ
+    ).strftime(
         "%d.%m.%Y %H:%M"
     )
 
